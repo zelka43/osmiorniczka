@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #0a0a0f;
+  --color-foreground: #e8e8ed;
+  --color-card: #12121a;
+  --color-card-hover: #1a1a25;
+  --color-border: #1e1e2e;
+  --color-border-bright: #2a2a3e;
+  --color-neon-green: #00ff88;
+  --color-neon-green-dim: #00cc6a;
+  --color-neon-red: #ff3366;
+  --color-neon-red-dim: #cc2952;
+  --color-neon-blue: #3388ff;
+  --color-neon-yellow: #ffcc00;
+  --color-neon-purple: #aa55ff;
+  --color-muted: #6b6b80;
+  --color-surface: #16161f;
+  --color-surface-light: #1c1c28;
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overscroll-behavior: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-bright);
+  border-radius: 4px;
+}
+
+/* Glass card effect */
+.glass {
+  background: rgba(18, 18, 26, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-light {
+  background: rgba(28, 28, 40, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Glow effects */
+.glow-green {
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.15), 0 0 40px rgba(0, 255, 136, 0.05);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px rgba(255, 51, 102, 0.15), 0 0 40px rgba(255, 51, 102, 0.05);
+}
+
+.glow-blue {
+  box-shadow: 0 0 20px rgba(51, 136, 255, 0.15), 0 0 40px rgba(51, 136, 255, 0.05);
+}
+
+/* Neon text glow */
+.text-glow-green {
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.2);
+}
+
+.text-glow-red {
+  text-shadow: 0 0 10px rgba(255, 51, 102, 0.5), 0 0 20px rgba(255, 51, 102, 0.2);
+}
+
+/* Gradient mesh background */
+.mesh-bg {
+  background-image:
+    radial-gradient(at 20% 80%, rgba(0, 255, 136, 0.04) 0, transparent 50%),
+    radial-gradient(at 80% 20%, rgba(51, 136, 255, 0.04) 0, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(170, 85, 255, 0.02) 0, transparent 50%);
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-card) 25%, var(--color-card-hover) 50%, var(--color-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* Pulse animation for active player — strong, unmissable */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.35), 0 0 50px rgba(0, 255, 136, 0.15), inset 0 0 15px rgba(0, 255, 136, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(0, 255, 136, 0.55), 0 0 80px rgba(0, 255, 136, 0.25), inset 0 0 25px rgba(0, 255, 136, 0.08);
+  }
+}
+
+.pulse-active {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+/* Dimmed inactive player */
+.player-inactive {
+  opacity: 0.45;
+  filter: brightness(0.7);
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+/* Safe area for mobile */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

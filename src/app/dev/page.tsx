@@ -1,0 +1,332 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { Shield, Trash2, Calendar, Download, Upload, AlertTriangle, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  deleteMatchesSince,
+  recalculateAllPlayerStats,
+  clearAllData,
+  exportAllData,
+  importAllData,
+  getMatches,
+} from "@/lib/store";
+
+const DEV_PASSWORD = "dart2024";
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
+};
+
+export default function DevPage() {
+  const router = useRouter();
+  const [authenticated, setAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+  const [deleteDate, setDeleteDate] = useState("");
+  const [confirmAction, setConfirmAction] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showMessage = (text: string, type: "success" | "error" = "success") => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  const handleLogin = () => {
+    if (password === DEV_PASSWORD) {
+      setAuthenticated(true);
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+    }
+  };
+
+  const handleDeleteSince = async () => {
+    if (!deleteDate) return;
+    const timestamp = new Date(deleteDate).getTime();
+    const matchesBefore = (await getMatches()).length;
+    await deleteMatchesSince(timestamp);
+    await recalculateAllPlayerStats();
+    const matchesAfter = (await getMatches()).length;
+    const deleted = matchesBefore - matchesAfter;
+    showMessage(`Usunięto ${deleted} meczów i przeliczono statystyki.`);
+    setConfirmAction(null);
+    setDeleteDate("");
+  };
+
+  const handleClearAll = async () => {
+    await clearAllData();
+    showMessage("Wszystkie dane zostały usunięte.");
+    setConfirmAction(null);
+  };
+
+  const handleRecalculate = async () => {
+    await recalculateAllPlayerStats();
+    showMessage("Statystyki zostały przeliczone.");
+    setConfirmAction(null);
+  };
+
+  const handleExport = async () => {
+    const data = await exportAllData();
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `dart-scorer-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showMessage("Dane wyeksportowane.");
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        await importAllData(ev.target?.result as string);
+        showMessage("Dane zaimportowane pomyślnie.");
+      } catch {
+        showMessage("Błąd importu — nieprawidłowy format pliku.", "error");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  if (!authenticated) {
+    return (
+      <div className="flex flex-col min-h-[100dvh] items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass rounded-3xl p-8 w-full max-w-sm text-center space-y-6"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-neon-red/10 flex items-center justify-center mx-auto">
+            <Shield size={32} className="text-neon-red" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-foreground mb-1">Tryb developera</h1>
+            <p className="text-xs text-muted">Wprowadź hasło, aby kontynuować</p>
+          </div>
+          <div className="space-y-3">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setPasswordError(false);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="Hasło"
+              className={`w-full bg-surface rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted/50 border ${
+                passwordError ? "border-neon-red/50" : "border-white/5"
+              } focus:outline-none focus:border-neon-blue/30`}
+            />
+            {passwordError && (
+              <p className="text-neon-red text-xs">Nieprawidłowe hasło</p>
+            )}
+            <button
+              onClick={handleLogin}
+              className="w-full rounded-xl py-3 bg-neon-red/15 text-neon-red font-bold text-sm hover:bg-neon-red/25 transition-all"
+            >
+              Zaloguj
+            </button>
+          </div>
+          <button
+            onClick={() => router.push("/")}
+            className="text-xs text-muted hover:text-foreground transition-colors"
+          >
+            ← Wróć
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col min-h-[100dvh]">
+      <main className="flex-1 overflow-y-auto px-4 pt-6 pb-8">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{ show: { transition: { staggerChildren: 0.08 } } }}
+          className="max-w-lg mx-auto space-y-4"
+        >
+          {/* Header */}
+          <motion.div variants={item} className="flex items-center gap-3 pt-4">
+            <button
+              onClick={() => router.push("/")}
+              className="w-10 h-10 rounded-xl glass flex items-center justify-center"
+            >
+              <ArrowLeft size={18} className="text-muted" />
+            </button>
+            <div className="flex items-center gap-2">
+              <Shield size={20} className="text-neon-red" />
+              <h1 className="text-lg font-bold text-foreground">Tryb developera</h1>
+            </div>
+          </motion.div>
+
+          {/* Message toast */}
+          {message && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={`rounded-xl px-4 py-3 text-sm font-medium ${
+                message.type === "success"
+                  ? "bg-neon-green/10 text-neon-green border border-neon-green/20"
+                  : "bg-neon-red/10 text-neon-red border border-neon-red/20"
+              }`}
+            >
+              {message.text}
+            </motion.div>
+          )}
+
+          {/* Delete stats from date */}
+          <motion.div variants={item} className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Calendar size={18} className="text-neon-yellow" />
+              <h2 className="text-sm font-bold text-foreground">Usuń mecze od daty</h2>
+            </div>
+            <p className="text-xs text-muted">
+              Usuwa wszystkie mecze od wybranej daty i przelicza statystyki graczy.
+            </p>
+            <input
+              type="date"
+              value={deleteDate}
+              onChange={(e) => setDeleteDate(e.target.value)}
+              className="w-full bg-surface rounded-xl px-4 py-3 text-sm text-foreground border border-white/5 focus:outline-none focus:border-neon-blue/30"
+            />
+            {confirmAction === "deleteSince" ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteSince}
+                  className="flex-1 rounded-xl py-2.5 bg-neon-red/15 text-neon-red font-bold text-xs hover:bg-neon-red/25 transition-all"
+                >
+                  Potwierdź usunięcie
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className="flex-1 rounded-xl py-2.5 bg-surface text-muted font-bold text-xs hover:bg-surface-light transition-all"
+                >
+                  Anuluj
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => deleteDate && setConfirmAction("deleteSince")}
+                disabled={!deleteDate}
+                className="w-full rounded-xl py-2.5 bg-neon-yellow/10 text-neon-yellow font-bold text-xs hover:bg-neon-yellow/20 transition-all disabled:opacity-30"
+              >
+                Usuń mecze
+              </button>
+            )}
+          </motion.div>
+
+          {/* Recalculate stats */}
+          <motion.div variants={item} className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={18} className="text-neon-blue" />
+              <h2 className="text-sm font-bold text-foreground">Przelicz statystyki</h2>
+            </div>
+            <p className="text-xs text-muted">
+              Przelicza statystyki wszystkich graczy i rekordy H2H na podstawie istniejących meczów.
+            </p>
+            {confirmAction === "recalculate" ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRecalculate}
+                  className="flex-1 rounded-xl py-2.5 bg-neon-blue/15 text-neon-blue font-bold text-xs hover:bg-neon-blue/25 transition-all"
+                >
+                  Potwierdź
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className="flex-1 rounded-xl py-2.5 bg-surface text-muted font-bold text-xs hover:bg-surface-light transition-all"
+                >
+                  Anuluj
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmAction("recalculate")}
+                className="w-full rounded-xl py-2.5 bg-neon-blue/10 text-neon-blue font-bold text-xs hover:bg-neon-blue/20 transition-all"
+              >
+                Przelicz
+              </button>
+            )}
+          </motion.div>
+
+          {/* Export / Import */}
+          <motion.div variants={item} className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Download size={18} className="text-neon-purple" />
+              <h2 className="text-sm font-bold text-foreground">Backup danych</h2>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExport}
+                className="flex-1 rounded-xl py-2.5 bg-neon-purple/10 text-neon-purple font-bold text-xs hover:bg-neon-purple/20 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Download size={14} />
+                Eksport
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 rounded-xl py-2.5 bg-neon-green/10 text-neon-green font-bold text-xs hover:bg-neon-green/20 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Upload size={14} />
+                Import
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                className="hidden"
+              />
+            </div>
+          </motion.div>
+
+          {/* Clear all data */}
+          <motion.div variants={item} className="glass rounded-2xl p-4 space-y-3 border border-neon-red/10">
+            <div className="flex items-center gap-2">
+              <Trash2 size={18} className="text-neon-red" />
+              <h2 className="text-sm font-bold text-neon-red">Wyczyść wszystkie dane</h2>
+            </div>
+            <p className="text-xs text-muted">
+              Usuwa wszystkich graczy, mecze, rekordy H2H i aktywny mecz. Tej operacji nie można cofnąć!
+            </p>
+            {confirmAction === "clearAll" ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleClearAll}
+                  className="flex-1 rounded-xl py-2.5 bg-neon-red text-background font-bold text-xs hover:bg-neon-red/80 transition-all"
+                >
+                  Tak, wyczyść wszystko
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className="flex-1 rounded-xl py-2.5 bg-surface text-muted font-bold text-xs hover:bg-surface-light transition-all"
+                >
+                  Anuluj
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmAction("clearAll")}
+                className="w-full rounded-xl py-2.5 bg-neon-red/10 text-neon-red font-bold text-xs hover:bg-neon-red/20 transition-all"
+              >
+                Wyczyść dane
+              </button>
+            )}
+          </motion.div>
+        </motion.div>
+      </main>
+    </div>
+  );
+}
