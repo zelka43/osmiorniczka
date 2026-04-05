@@ -13,13 +13,13 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ośmiorniczka",
+  title: "Ośmiornica",
   description: "Profesjonalna aplikacja do darta",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Ośmiorniczka",
+    title: "Ośmiornica",
   },
 };
 

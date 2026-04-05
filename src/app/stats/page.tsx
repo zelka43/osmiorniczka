@@ -44,6 +44,7 @@ interface RankedPlayer {
   threeDartAvg: number;
   checkoutPct: number;
   colorIndex: number;
+  points: number;
 }
 
 export default function StatsPage() {
@@ -52,6 +53,7 @@ export default function StatsPage() {
   const [mounted, setMounted] = useState(false);
   const [period, setPeriod] = useState<TimePeriod>("all");
   const [offset, setOffset] = useState(0);
+  const [rankingMode, setRankingMode] = useState<"winpct" | "points">("winpct");
 
   useEffect(() => {
     async function load() {
@@ -61,6 +63,10 @@ export default function StatsPage() {
       setMounted(true);
     }
     load();
+    try {
+      const saved = localStorage.getItem("dart_ranking_mode");
+      if (saved === "points" || saved === "winpct") setRankingMode(saved);
+    } catch {}
   }, []);
 
   const currentRange = useMemo(() => getPeriodRange(period, offset), [period, offset]);
@@ -88,14 +94,30 @@ export default function StatsPage() {
           players.findIndex((p) => p.id === player.id) %
           PLAYER_COLORS.length;
 
-        return { player, stats, winPct, threeDartAvg, checkoutPct, colorIndex };
+        // Points = total defeated players × win rate
+        const playersDefeated = matches
+          .filter(
+            (m) =>
+              m.status === "completed" &&
+              m.winnerId === player.id &&
+              m.createdAt >= currentRange.start &&
+              m.createdAt < currentRange.end
+          )
+          .reduce((sum, m) => sum + m.playerIds.length - 1, 0);
+        const points = playersDefeated * (winPct / 100);
+
+        return { player, stats, winPct, threeDartAvg, checkoutPct, colorIndex, points };
       })
       .filter((r): r is RankedPlayer => r !== null)
       .sort((a, b) => {
+        if (rankingMode === "points") {
+          if (b.points !== a.points) return b.points - a.points;
+          return b.threeDartAvg - a.threeDartAvg;
+        }
         if (b.winPct !== a.winPct) return b.winPct - a.winPct;
         return b.threeDartAvg - a.threeDartAvg;
       });
-  }, [players, matches, period, offset, currentRange]);
+  }, [players, matches, period, offset, currentRange, rankingMode]);
 
   if (!mounted) {
     return (
@@ -219,7 +241,7 @@ export default function StatsPage() {
                     <span>Gracz</span>
                     <span className="text-center">M</span>
                     <span className="text-center">W</span>
-                    <span className="text-center">Win%</span>
+                    <span className="text-center">{rankingMode === "points" ? "Pkt" : "Win%"}</span>
                     <span className="text-center">Avg</span>
                     <span className="text-center">CO%</span>
                     <span className="text-center">180</span>
@@ -284,13 +306,15 @@ export default function StatsPage() {
                           {r.stats.matchesWon}
                         </span>
 
-                        {/* Win % */}
+                        {/* Win % or Points */}
                         <span
                           className={`text-center font-mono text-sm font-semibold ${
                             isTop ? "text-neon-green" : "text-foreground"
                           }`}
                         >
-                          {r.winPct.toFixed(0)}
+                          {rankingMode === "points"
+                            ? r.points.toFixed(1)
+                            : r.winPct.toFixed(0)}
                         </span>
 
                         {/* 3-dart avg */}

@@ -272,6 +272,71 @@ export async function recalculateAllPlayerStats(): Promise<void> {
   }
 }
 
+// Recalculate doublesAttempted/doublesHit from detailed-mode turn data.
+// Only processes turns where darts array is filled (dart-by-dart mode).
+// Returns number of matches that were updated.
+export async function recalculateDoublesFromHistory(): Promise<number> {
+  const isDoubleTerritory = (r: number) =>
+    (r <= 40 && r % 2 === 0 && r > 0) || r === 50;
+
+  const matches = (await getMatches()).filter((m) => m.status === "completed");
+  let matchesFixed = 0;
+
+  for (const match of matches) {
+    const newScores = { ...match.scores };
+    let changed = false;
+
+    for (const playerId of match.playerIds) {
+      const playerTurns = match.turns.filter(
+        (t) => t.playerId === playerId && t.darts.length > 0
+      );
+      if (playerTurns.length === 0) continue;
+
+      let doublesAttempted = 0;
+      let doublesHit = 0;
+
+      for (const turn of playerTurns) {
+        // Reconstruct remaining before this turn
+        const remainingBefore = turn.isBust
+          ? turn.remainingAfter
+          : turn.remainingAfter + turn.turnTotal;
+        let r = remainingBefore;
+
+        for (const dart of turn.darts) {
+          if (isDoubleTerritory(r)) {
+            doublesAttempted++;
+            if (r - dart.score === 0) doublesHit++;
+          }
+          r -= dart.score;
+          if (r <= 0) break;
+        }
+      }
+
+      if (
+        newScores[playerId] &&
+        (newScores[playerId].doublesAttempted !== doublesAttempted ||
+          newScores[playerId].doublesHit !== doublesHit)
+      ) {
+        newScores[playerId] = {
+          ...newScores[playerId],
+          doublesAttempted,
+          doublesHit,
+        };
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await saveMatch({ ...match, scores: newScores });
+      matchesFixed++;
+    }
+  }
+
+  // Re-aggregate player stats from corrected match data
+  await recalculateAllPlayerStats();
+  return matchesFixed;
+}
+
 export async function clearAllData(): Promise<void> {
   await supabase.from("matches").delete().neq("id", "");
   await supabase.from("players").delete().neq("id", "");
@@ -318,6 +383,33 @@ export async function importAllData(json: string): Promise<void> {
   if (data.activeMatch) {
     await setActiveMatch(data.activeMatch);
   }
+}
+
+// ─── Real-time ───
+
+export function subscribeToMatch(
+  id: string,
+  callback: (match: Match) => void
+): () => void {
+  const channel = supabase
+    .channel(`match-realtime-${id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "matches",
+        filter: `id=eq.${id}`,
+      },
+      (payload) => {
+        callback(mapMatch(payload.new));
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
 
 // ─── Avatar Upload ───

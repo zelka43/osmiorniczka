@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Shield, Trash2, Calendar, Download, Upload, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Shield, Trash2, Calendar, Download, Upload, AlertTriangle, ArrowLeft, Target, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   deleteMatchesSince,
   recalculateAllPlayerStats,
+  recalculateDoublesFromHistory,
   clearAllData,
   exportAllData,
   importAllData,
@@ -28,7 +29,15 @@ export default function DevPage() {
   const [deleteDate, setDeleteDate] = useState("");
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [rankingMode, setRankingMode] = useState<"winpct" | "points">("winpct");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("dart_ranking_mode");
+      if (saved === "points" || saved === "winpct") setRankingMode(saved);
+    } catch {}
+  }, []);
 
   const showMessage = (text: string, type: "success" | "error" = "success") => {
     setMessage({ text, type });
@@ -67,6 +76,18 @@ export default function DevPage() {
     await recalculateAllPlayerStats();
     showMessage("Statystyki zostały przeliczone.");
     setConfirmAction(null);
+  };
+
+  const handleRecalculateDoubles = async () => {
+    const fixed = await recalculateDoublesFromHistory();
+    showMessage(`Przeliczono double w ${fixed} meczu/${fixed === 1 ? "" : "ach"} (tryb szczegółowy).`);
+    setConfirmAction(null);
+  };
+
+  const handleRankingModeChange = (mode: "winpct" | "points") => {
+    setRankingMode(mode);
+    try { localStorage.setItem("dart_ranking_mode", mode); } catch {}
+    showMessage(`Tryb rankingu: ${mode === "points" ? "System punktowy" : "% zwycięstw"}`);
   };
 
   const handleExport = async () => {
@@ -290,6 +311,78 @@ export default function DevPage() {
                 className="hidden"
               />
             </div>
+          </motion.div>
+
+          {/* Ranking mode */}
+          <motion.div variants={item} className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Trophy size={18} className="text-neon-yellow" />
+              <h2 className="text-sm font-bold text-foreground">Tryb rankingu (tabela)</h2>
+            </div>
+            <p className="text-xs text-muted">
+              Sposób sortowania graczy w tabeli statystyk.
+            </p>
+            <div className="flex gap-2 p-1 bg-surface rounded-xl">
+              <button
+                onClick={() => handleRankingModeChange("winpct")}
+                className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                  rankingMode === "winpct"
+                    ? "bg-neon-green/15 text-neon-green"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                % zwycięstw
+              </button>
+              <button
+                onClick={() => handleRankingModeChange("points")}
+                className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                  rankingMode === "points"
+                    ? "bg-neon-yellow/15 text-neon-yellow"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                System punktowy
+              </button>
+            </div>
+            {rankingMode === "points" && (
+              <p className="text-xs text-muted">
+                Pkt = Pokonani gracze × Win%. Nagradza wygrywanie z większymi grupami.
+              </p>
+            )}
+          </motion.div>
+
+          {/* Recalculate doubles */}
+          <motion.div variants={item} className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Target size={18} className="text-neon-purple" />
+              <h2 className="text-sm font-bold text-foreground">Przelicz double z historii</h2>
+            </div>
+            <p className="text-xs text-muted">
+              Naprawia statystyki doubli dla meczów w trybie szczegółowym (dart po darcie), na podstawie zapisanych rzutów.
+            </p>
+            {confirmAction === "recalcDoubles" ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRecalculateDoubles}
+                  className="flex-1 rounded-xl py-2.5 bg-neon-purple/15 text-neon-purple font-bold text-xs hover:bg-neon-purple/25 transition-all"
+                >
+                  Potwierdź
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className="flex-1 rounded-xl py-2.5 bg-surface text-muted font-bold text-xs hover:bg-surface-light transition-all"
+                >
+                  Anuluj
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmAction("recalcDoubles")}
+                className="w-full rounded-xl py-2.5 bg-neon-purple/10 text-neon-purple font-bold text-xs hover:bg-neon-purple/20 transition-all"
+              >
+                Przelicz double
+              </button>
+            )}
           </motion.div>
 
           {/* Clear all data */}

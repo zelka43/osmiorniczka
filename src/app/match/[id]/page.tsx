@@ -14,7 +14,7 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-import { getMatchById, saveMatch, setActiveMatch, getPlayers, updatePlayer } from "@/lib/store";
+import { getMatchById, saveMatch, setActiveMatch, getPlayers, updatePlayer, subscribeToMatch } from "@/lib/store";
 import { updateH2H } from "@/lib/store";
 import { validateScore, processTurn } from "@/lib/dartLogic";
 import { getCheckout } from "@/lib/checkouts";
@@ -97,11 +97,26 @@ export default function MatchPage({
     }
     load();
 
+    // Real-time sync: update match state when another device submits a turn
+    const unsubscribe = subscribeToMatch(id, (updated) => {
+      setMatch((prev) => {
+        if (!prev) return updated;
+        // Accept update if remote has more turns or status changed
+        if (updated.turns.length > prev.turns.length || updated.status !== prev.status) {
+          return updated;
+        }
+        return prev;
+      });
+    });
+
     const onFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      unsubscribe();
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+    };
   }, [id]);
 
   const persistMatch = useCallback(
@@ -205,6 +220,10 @@ export default function MatchPage({
     setPendingScore(null);
   };
 
+  // Returns true when a score counts as "in double territory" (player should aim at a double)
+  const isDoubleTerritory = (remaining: number): boolean =>
+    (remaining <= 40 && remaining % 2 === 0 && remaining > 0) || remaining === 50;
+
   const applyTurnDetailed = async (darts: Dart[], turnTotal: number) => {
     if (!match) return;
 
@@ -215,19 +234,19 @@ export default function MatchPage({
     const result = processDartByDartTurn(currentState.remaining, darts);
     const actualDartsThrown = darts.filter((d) => d.segment !== 0 || d.score === 0).length;
 
-    // Count doubles attempted/hit from dart data
+    // Count doubles attempted/hit based on remaining BEFORE each dart
     let newDoublesAttempted = currentState.doublesAttempted;
     let newDoublesHit = currentState.doublesHit;
-    for (let i = 0; i < darts.length; i++) {
-      if (darts[i].multiplier === 2 && darts[i].segment > 0) {
+    let runningRemaining = currentState.remaining;
+    for (const dart of darts) {
+      if (isDoubleTerritory(runningRemaining)) {
         newDoublesAttempted++;
-        // Check if this dart was the finishing dart
-        let remainingBefore = currentState.remaining;
-        for (let j = 0; j < i; j++) remainingBefore -= darts[j].score;
-        if (remainingBefore - darts[i].score === 0) {
+        if (runningRemaining - dart.score === 0) {
           newDoublesHit++;
         }
       }
+      runningRemaining -= dart.score;
+      if (runningRemaining <= 0) break;
     }
 
     const turn: Turn = {
@@ -309,10 +328,10 @@ export default function MatchPage({
 
     const result = processTurn(currentState.remaining, score, isDoubleFinish);
 
-    // In quick mode, if player was in checkout range and turn is not a bust, ask about doubles
+    // In quick mode, if player was in double territory (≤40 even, or 50) and turn is not a bust, ask about doubles
     if (
       inputMode === "quick" &&
-      currentState.remaining <= 170 &&
+      isDoubleTerritory(currentState.remaining) &&
       !result.isBust
     ) {
       setPendingQuickTurn({
@@ -579,10 +598,11 @@ export default function MatchPage({
       </div>
 
       {/* Scoreboard */}
-      <div className="px-3 py-2 overflow-x-auto">
-        <div className={`grid gap-2 ${match.playerIds.length <= 4 ? `grid-cols-${match.playerIds.length}` : "grid-cols-3"}`}
+      <div className="px-3 py-2">
+        <div
+          className="grid gap-2"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(match.playerIds.length, match.playerIds.length <= 5 ? match.playerIds.length : 3)}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${Math.min(match.playerIds.length, 3)}, minmax(0, 1fr))`,
           }}
         >
           {match.playerIds.map((playerId, idx) => {
