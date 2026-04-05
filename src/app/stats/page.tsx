@@ -255,7 +255,7 @@ export default function StatsPage() {
                     <span className="text-center">{rankingMode === "points" ? "Pkt" : rankingMode === "rating" ? "Rtg" : "Win%"}</span>
                     <span className="text-center">Avg</span>
                     <span className="text-center">CO%</span>
-                    <span className="text-center">180</span>
+                    <span className="text-center">100+</span>
                   </div>
 
                   {/* Table Rows */}
@@ -337,12 +337,12 @@ export default function StatsPage() {
 
                         {/* Checkout % */}
                         <span className="text-center font-mono text-sm text-neon-purple">
-                          {r.checkoutPct.toFixed(0)}
+                          {r.checkoutPct.toFixed(1)}
                         </span>
 
                         {/* 180s */}
                         <span className="text-center font-mono text-sm text-neon-yellow">
-                          {r.stats.oneEighties}
+                          {r.stats.tonPlus + r.stats.oneEighties}
                         </span>
                       </motion.div>
                     );
@@ -361,7 +361,7 @@ export default function StatsPage() {
                 <span>Win% = Procent wygranych</span>
                 <span>Avg = Średnia z 3 rzutów</span>
                 <span>CO% = Checkout %</span>
-                <span>180 = Maksima</span>
+                <span>100+ = Wyniki ≥100</span>
               </motion.div>
             </>
           )}
