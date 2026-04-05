@@ -45,6 +45,7 @@ interface RankedPlayer {
   checkoutPct: number;
   colorIndex: number;
   points: number;
+  rating: number;
 }
 
 export default function StatsPage() {
@@ -53,7 +54,7 @@ export default function StatsPage() {
   const [mounted, setMounted] = useState(false);
   const [period, setPeriod] = useState<TimePeriod>("all");
   const [offset, setOffset] = useState(0);
-  const [rankingMode, setRankingMode] = useState<"winpct" | "points">("winpct");
+  const [rankingMode, setRankingMode] = useState<"winpct" | "points" | "rating">("winpct");
 
   useEffect(() => {
     async function load() {
@@ -65,7 +66,7 @@ export default function StatsPage() {
     load();
     try {
       const saved = localStorage.getItem("dart_ranking_mode");
-      if (saved === "points" || saved === "winpct") setRankingMode(saved);
+      if (saved === "points" || saved === "winpct" || saved === "rating") setRankingMode(saved);
     } catch {}
   }, []);
 
@@ -94,24 +95,35 @@ export default function StatsPage() {
           players.findIndex((p) => p.id === player.id) %
           PLAYER_COLORS.length;
 
-        // Points = total defeated players × win rate
-        const playersDefeated = matches
-          .filter(
-            (m) =>
-              m.status === "completed" &&
-              m.winnerId === player.id &&
-              m.createdAt >= currentRange.start &&
-              m.createdAt < currentRange.end
-          )
+        const periodMatches = matches.filter(
+          (m) =>
+            m.status === "completed" &&
+            m.playerIds.includes(player.id) &&
+            m.createdAt >= currentRange.start &&
+            m.createdAt < currentRange.end
+        );
+
+        // Mode 2: Points = total defeated players × win rate
+        const playersDefeated = periodMatches
+          .filter((m) => m.winnerId === player.id)
           .reduce((sum, m) => sum + m.playerIds.length - 1, 0);
         const points = playersDefeated * (winPct / 100);
 
-        return { player, stats, winPct, threeDartAvg, checkoutPct, colorIndex, points };
+        // Mode 3: Rating = actual wins / expected wins (Σ 1/n per match)
+        const actualWins = periodMatches.filter((m) => m.winnerId === player.id).length;
+        const expectedWins = periodMatches.reduce((sum, m) => sum + 1 / m.playerIds.length, 0);
+        const rating = expectedWins > 0 ? actualWins / expectedWins : 0;
+
+        return { player, stats, winPct, threeDartAvg, checkoutPct, colorIndex, points, rating };
       })
       .filter((r): r is RankedPlayer => r !== null)
       .sort((a, b) => {
         if (rankingMode === "points") {
           if (b.points !== a.points) return b.points - a.points;
+          return b.threeDartAvg - a.threeDartAvg;
+        }
+        if (rankingMode === "rating") {
+          if (b.rating !== a.rating) return b.rating - a.rating;
           return b.threeDartAvg - a.threeDartAvg;
         }
         if (b.winPct !== a.winPct) return b.winPct - a.winPct;
@@ -241,7 +253,7 @@ export default function StatsPage() {
                     <span>Gracz</span>
                     <span className="text-center">M</span>
                     <span className="text-center">W</span>
-                    <span className="text-center">{rankingMode === "points" ? "Pkt" : "Win%"}</span>
+                    <span className="text-center">{rankingMode === "points" ? "Pkt" : rankingMode === "rating" ? "Rtg" : "Win%"}</span>
                     <span className="text-center">Avg</span>
                     <span className="text-center">CO%</span>
                     <span className="text-center">180</span>
@@ -314,6 +326,8 @@ export default function StatsPage() {
                         >
                           {rankingMode === "points"
                             ? r.points.toFixed(1)
+                            : rankingMode === "rating"
+                            ? r.rating.toFixed(2)
                             : r.winPct.toFixed(0)}
                         </span>
 

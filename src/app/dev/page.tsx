@@ -29,13 +29,13 @@ export default function DevPage() {
   const [deleteDate, setDeleteDate] = useState("");
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const [rankingMode, setRankingMode] = useState<"winpct" | "points">("winpct");
+  const [rankingMode, setRankingMode] = useState<"winpct" | "points" | "rating">("winpct");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("dart_ranking_mode");
-      if (saved === "points" || saved === "winpct") setRankingMode(saved);
+      if (saved === "points" || saved === "winpct" || saved === "rating") setRankingMode(saved);
     } catch {}
   }, []);
 
@@ -84,10 +84,11 @@ export default function DevPage() {
     setConfirmAction(null);
   };
 
-  const handleRankingModeChange = (mode: "winpct" | "points") => {
+  const handleRankingModeChange = (mode: "winpct" | "points" | "rating") => {
     setRankingMode(mode);
     try { localStorage.setItem("dart_ranking_mode", mode); } catch {}
-    showMessage(`Tryb rankingu: ${mode === "points" ? "System punktowy" : "% zwycięstw"}`);
+    const labels = { winpct: "% zwycięstw", points: "Pokonani × Win%", rating: "W/E[W]" };
+    showMessage(`Tryb rankingu: ${labels[mode]}`);
   };
 
   const handleExport = async () => {
@@ -322,33 +323,43 @@ export default function DevPage() {
             <p className="text-xs text-muted">
               Sposób sortowania graczy w tabeli statystyk.
             </p>
-            <div className="flex gap-2 p-1 bg-surface rounded-xl">
+            <div className="flex gap-1 p-1 bg-surface rounded-xl">
               <button
                 onClick={() => handleRankingModeChange("winpct")}
-                className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                className={`flex-1 rounded-lg py-2 text-[10px] font-bold transition-all ${
                   rankingMode === "winpct"
                     ? "bg-neon-green/15 text-neon-green"
                     : "text-muted hover:text-foreground"
                 }`}
               >
-                % zwycięstw
+                Win%
               </button>
               <button
                 onClick={() => handleRankingModeChange("points")}
-                className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                className={`flex-1 rounded-lg py-2 text-[10px] font-bold transition-all ${
                   rankingMode === "points"
                     ? "bg-neon-yellow/15 text-neon-yellow"
                     : "text-muted hover:text-foreground"
                 }`}
               >
-                System punktowy
+                Pkt
+              </button>
+              <button
+                onClick={() => handleRankingModeChange("rating")}
+                className={`flex-1 rounded-lg py-2 text-[10px] font-bold transition-all ${
+                  rankingMode === "rating"
+                    ? "bg-neon-blue/15 text-neon-blue"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                W/E[W]
               </button>
             </div>
-            {rankingMode === "points" && (
-              <p className="text-xs text-muted">
-                Pkt = Pokonani gracze × Win%. Nagradza wygrywanie z większymi grupami.
-              </p>
-            )}
+            <p className="text-xs text-muted">
+              {rankingMode === "winpct" && "Klasyczny ranking: % wygranych meczów."}
+              {rankingMode === "points" && "Pkt = Pokonani gracze × Win%. Nagradza wygrywanie z większymi grupami."}
+              {rankingMode === "rating" && "W/E[W]: wygrane / oczekiwane wygrane (Σ 1/n). Wygrana z 6 osobami = 6× trudniejsza niż z 2."}
+            </p>
           </motion.div>
 
           {/* Recalculate doubles */}

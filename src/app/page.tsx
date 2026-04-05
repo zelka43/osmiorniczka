@@ -108,7 +108,7 @@ export default function DashboardPage() {
               onClick={handleTitleTap}
               className="text-3xl font-bold tracking-tight text-glow-green text-neon-green cursor-default select-none"
             >
-              OŚMIORNICZKA
+              OŚMIORNICA
             </h1>
             <p className="text-muted text-sm mt-1">
               Profesjonalny licznik punktów

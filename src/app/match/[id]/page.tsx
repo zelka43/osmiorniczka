@@ -14,7 +14,7 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-import { getMatchById, saveMatch, setActiveMatch, getPlayers, updatePlayer, subscribeToMatch } from "@/lib/store";
+import { getMatchById, saveMatch, setActiveMatch, getPlayers, updatePlayer } from "@/lib/store";
 import { updateH2H } from "@/lib/store";
 import { validateScore, processTurn } from "@/lib/dartLogic";
 import { getCheckout } from "@/lib/checkouts";
@@ -97,24 +97,30 @@ export default function MatchPage({
     }
     load();
 
-    // Real-time sync: update match state when another device submits a turn
-    const unsubscribe = subscribeToMatch(id, (updated) => {
+    // Live sync: poll for changes every 3 seconds so other devices see updates
+    const pollInterval = setInterval(async () => {
+      if (document.hidden) return;
+      const latest = await getMatchById(id);
+      if (!latest) return;
       setMatch((prev) => {
-        if (!prev) return updated;
-        // Accept update if remote has more turns or status changed
-        if (updated.turns.length > prev.turns.length || updated.status !== prev.status) {
-          return updated;
+        if (!prev) return latest;
+        if (
+          latest.turns.length !== prev.turns.length ||
+          latest.status !== prev.status ||
+          latest.currentPlayerIndex !== prev.currentPlayerIndex
+        ) {
+          return latest;
         }
         return prev;
       });
-    });
+    }, 3000);
 
     const onFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => {
-      unsubscribe();
+      clearInterval(pollInterval);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
     };
   }, [id]);
