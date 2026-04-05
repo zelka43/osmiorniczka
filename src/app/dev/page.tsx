@@ -12,6 +12,8 @@ import {
   exportAllData,
   importAllData,
   getMatches,
+  getAppSetting,
+  setAppSetting,
 } from "@/lib/store";
 
 const DEV_PASSWORD = "dart2024";
@@ -33,10 +35,11 @@ export default function DevPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("dart_ranking_mode");
+    async function loadSettings() {
+      const saved = await getAppSetting("ranking_mode");
       if (saved === "points" || saved === "winpct" || saved === "rating") setRankingMode(saved);
-    } catch {}
+    }
+    loadSettings();
   }, []);
 
   const showMessage = (text: string, type: "success" | "error" = "success") => {
@@ -84,9 +87,9 @@ export default function DevPage() {
     setConfirmAction(null);
   };
 
-  const handleRankingModeChange = (mode: "winpct" | "points" | "rating") => {
+  const handleRankingModeChange = async (mode: "winpct" | "points" | "rating") => {
     setRankingMode(mode);
-    try { localStorage.setItem("dart_ranking_mode", mode); } catch {}
+    await setAppSetting("ranking_mode", mode);
     const labels = { winpct: "% zwycięstw", points: "Pokonani × Win%", rating: "W/E[W]" };
     showMessage(`Tryb rankingu: ${labels[mode]}`);
   };

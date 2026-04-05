@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { BarChart3, TrendingUp, Award, ChevronLeft, ChevronRight } from "lucide-react";
 import NavBar from "@/components/ui/NavBar";
 import PlayerAvatar from "@/components/ui/PlayerAvatar";
-import { getPlayers, getMatches } from "@/lib/store";
+import { getPlayers, getMatches, getAppSetting } from "@/lib/store";
 import {
   calculateThreeDartAvg,
   calculateCheckoutPercentage,
@@ -58,16 +58,15 @@ export default function StatsPage() {
 
   useEffect(() => {
     async function load() {
-      const [p, m] = await Promise.all([getPlayers(), getMatches()]);
+      const [p, m, savedMode] = await Promise.all([getPlayers(), getMatches(), getAppSetting("ranking_mode")]);
       setPlayers(p);
       setMatches(m);
+      if (savedMode === "points" || savedMode === "winpct" || savedMode === "rating") {
+        setRankingMode(savedMode);
+      }
       setMounted(true);
     }
     load();
-    try {
-      const saved = localStorage.getItem("dart_ranking_mode");
-      if (saved === "points" || saved === "winpct" || saved === "rating") setRankingMode(saved);
-    } catch {}
   }, []);
 
   const currentRange = useMemo(() => getPeriodRange(period, offset), [period, offset]);

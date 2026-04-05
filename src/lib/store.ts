@@ -385,6 +385,25 @@ export async function importAllData(json: string): Promise<void> {
   }
 }
 
+// ─── App Settings ───
+
+export async function getAppSetting(key: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", key)
+    .single();
+  if (error || !data) return null;
+  return data.value as string | null;
+}
+
+export async function setAppSetting(key: string, value: string): Promise<void> {
+  const { error } = await supabase
+    .from("app_state")
+    .upsert({ key, value });
+  if (error) console.error("setAppSetting error:", error);
+}
+
 // ─── Real-time ───
 
 export function subscribeToMatch(
