@@ -182,7 +182,7 @@ export function computeFavoriteDouble(matches: Match[], playerId: string): strin
   for (const m of matches) {
     if (m.status !== "completed") continue;
     for (const t of m.turns) {
-      if (t.playerId !== playerId || t.darts.length === 0 || t.isBust) continue;
+      if (t.playerId !== playerId || t.darts.length === 0 || !t.isCheckout) continue;
       const lastDart = t.darts[t.darts.length - 1];
       if (lastDart.multiplier === 2 && lastDart.segment > 0) {
         const label = lastDart.segment === 25 ? "Bull" : `D${lastDart.segment}`;
@@ -225,6 +225,21 @@ export function computeWinStreak(matches: Match[], playerId: string): number {
     else cur = 0;
   }
   return max;
+}
+
+/** Average first-9 average across all matches (for stat tile) */
+export function computeAvgFirst9Avg(matches: Match[], playerId: string): number {
+  const avgs: number[] = [];
+  for (const m of matches) {
+    if (m.status !== "completed") continue;
+    const playerTurns = m.turns.filter((t) => t.playerId === playerId).slice(0, 3);
+    if (playerTurns.length === 0) continue;
+    const points = playerTurns.reduce((s, t) => s + (t.isBust ? 0 : t.turnTotal), 0);
+    const darts = playerTurns.reduce((s, t) => s + (t.darts.length > 0 ? t.darts.length : 3), 0);
+    if (darts > 0) avgs.push((points / darts) * 3);
+  }
+  if (avgs.length === 0) return 0;
+  return avgs.reduce((s, v) => s + v, 0) / avgs.length;
 }
 
 /** Best first-9 average (first 3 turns) across all matches */

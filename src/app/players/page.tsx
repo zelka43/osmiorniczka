@@ -25,6 +25,7 @@ import {
   computeFavoriteDouble,
   computeHighestCheckout,
   computeWinStreak,
+  computeAvgFirst9Avg,
   computeBestFirst9Avg,
   computePeriodTitles,
   computeAchievementLeaders,
@@ -66,9 +67,9 @@ function computeRatingValue(player: Player, matches: Match[], mode: RankingMode)
 }
 
 const RING_BY_RANK: Record<number, string> = {
-  1: "ring-2 ring-yellow-400",
-  2: "ring-2 ring-gray-300",
-  3: "ring-2 ring-amber-600",
+  1: "ring-4 ring-yellow-400 shadow-[0_0_20px_6px_rgba(250,204,21,0.55)]",
+  2: "ring-4 ring-gray-300 shadow-[0_0_16px_4px_rgba(209,213,219,0.4)]",
+  3: "ring-4 ring-amber-600 shadow-[0_0_14px_4px_rgba(217,119,6,0.4)]",
 };
 
 const ACHIEVEMENT_META: Record<AchievementKey, { label: string; icon: React.ElementType; color: string; unit?: string }> = {
@@ -152,7 +153,7 @@ export default function PlayersPage() {
       favoriteDouble: computeFavoriteDouble(completedMatches, id),
       highestCheckout: computeHighestCheckout(completedMatches, id),
       winStreak: computeWinStreak(completedMatches, id),
-      bestFirst9: computeBestFirst9Avg(completedMatches, id),
+      avgFirst9: computeAvgFirst9Avg(completedMatches, id),
     };
   }, [selected, completedMatches]);
 
@@ -234,7 +235,7 @@ export default function PlayersPage() {
                   avatarUrl={selected.avatarUrl}
                   displayName={selected.displayName}
                   colorIndex={colorIndex}
-                  size="lg"
+                  size="xl"
                 />
               </div>
             )}
@@ -287,7 +288,7 @@ export default function PlayersPage() {
                   value={advancedStats?.t20t19 !== null && advancedStats?.t20t19 !== undefined ? advancedStats.t20t19 : "—"}
                 />
                 <StatTile
-                  label="Najlepszy CO"
+                  label="Rekord CO"
                   value={
                     advancedStats && advancedStats.highestCheckout.value > 0
                       ? `${advancedStats.highestCheckout.value}${advancedStats.highestCheckout.count > 1 ? ` (×${advancedStats.highestCheckout.count})` : ""}`
@@ -304,7 +305,7 @@ export default function PlayersPage() {
                 />
                 <StatTile
                   label="First 9 avg"
-                  value={advancedStats && advancedStats.bestFirst9 > 0 ? advancedStats.bestFirst9.toFixed(1) : "—"}
+                  value={advancedStats && advancedStats.avgFirst9 > 0 ? advancedStats.avgFirst9.toFixed(1) : "—"}
                 />
                 <StatTile
                   label="Najl. śr."
