@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Target, BarChart3, Users, Swords, History, Maximize2, Minimize2 } from "lucide-react";
+import { Home, Target, BarChart3, IdCard, Swords, History, Maximize2, Minimize2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const tabs = [
@@ -12,7 +12,7 @@ const tabs = [
   { label: "Historia", icon: History, href: "/match/history" },
   { label: "Statystyki", icon: BarChart3, href: "/stats" },
   { label: "H2H", icon: Swords, href: "/stats/h2h" },
-  { label: "Gracze", icon: Users, href: "/players/manage" },
+  { label: "Karty", icon: IdCard, href: "/players" },
 ] as const;
 
 export default function NavBar() {
@@ -41,6 +41,7 @@ export default function NavBar() {
     if (href === "/") return pathname === "/";
     if (href === "/stats") return pathname === "/stats";
     if (href === "/match/new") return pathname === "/match/new";
+    if (href === "/players") return pathname === "/players";
     return pathname.startsWith(href);
   };
 
