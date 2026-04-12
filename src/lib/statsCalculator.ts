@@ -257,16 +257,19 @@ export function computeBestFirst9Avg(matches: Match[], playerId: string): number
   return best;
 }
 
-/** How many period titles (weekly/monthly/yearly) a player has won.
+export interface PeriodMedals { gold: number; silver: number; bronze: number }
+
+/** How many period titles (weekly/monthly/yearly) a player has won, split by medal level.
  *  A title is awarded for the best RTG (W/E[W]) in a completed period,
  *  subject to minimum match counts: weekly=5, monthly=10, yearly=20. */
 export function computePeriodTitles(
   matches: Match[],
   playerId: string,
   allPlayerIds: string[]
-): { weekly: number; monthly: number; yearly: number } {
+): { weekly: PeriodMedals; monthly: PeriodMedals; yearly: PeriodMedals } {
+  const empty: PeriodMedals = { gold: 0, silver: 0, bronze: 0 };
   const completed = matches.filter((m) => m.status === "completed");
-  if (completed.length === 0) return { weekly: 0, monthly: 0, yearly: 0 };
+  if (completed.length === 0) return { weekly: { ...empty }, monthly: { ...empty }, yearly: { ...empty } };
 
   const earliest = Math.min(...completed.map((m) => m.createdAt));
   const now = new Date();
@@ -280,19 +283,20 @@ export function computePeriodTitles(
     return { rtg: expected > 0 ? wins / expected : 0, count };
   }
 
-  function getPeriodWinner(periods: { start: number; end: number }[], minMatches: number): number {
-    let titles = 0;
+  function getPeriodMedals(periods: { start: number; end: number }[], minMatches: number): PeriodMedals {
+    let gold = 0, silver = 0, bronze = 0;
     for (const { start, end } of periods) {
       if (end > Date.now()) continue; // skip current/future period
-      let bestRtg = -1;
-      let bestPid: string | null = null;
-      for (const pid of allPlayerIds) {
-        const { rtg, count } = rtgInRange(pid, start, end);
-        if (count >= minMatches && rtg > bestRtg) { bestRtg = rtg; bestPid = pid; }
-      }
-      if (bestPid === playerId) titles++;
+      const ranked = allPlayerIds
+        .map((pid) => ({ pid, ...rtgInRange(pid, start, end) }))
+        .filter((r) => r.count >= minMatches)
+        .sort((a, b) => b.rtg - a.rtg);
+      const rank = ranked.findIndex((r) => r.pid === playerId) + 1;
+      if (rank === 1) gold++;
+      else if (rank === 2) silver++;
+      else if (rank === 3) bronze++;
     }
-    return titles;
+    return { gold, silver, bronze };
   }
 
   // Build list of all past weeks (Mon–Sun)
@@ -326,9 +330,9 @@ export function computePeriodTitles(
   }
 
   return {
-    weekly: getPeriodWinner(weeks, 5),
-    monthly: getPeriodWinner(months, 10),
-    yearly: getPeriodWinner(years, 20),
+    weekly:  getPeriodMedals(weeks,  5),
+    monthly: getPeriodMedals(months, 10),
+    yearly:  getPeriodMedals(years,  20),
   };
 }
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Match } from "@/types";
 
 interface DartboardHeatmapProps {
@@ -68,9 +70,13 @@ const COLOR_DOUBLE = "#22c55e"; // neon-green
 const COLOR_BULL   = "#ef4444"; // neon-red
 
 export default function DartboardHeatmap({ matches, playerId }: DartboardHeatmapProps) {
+  const [showDoubleStats, setShowDoubleStats] = useState(false);
+
   // Collect dart data from detailed-mode turns only
   type HitKey = `${number}_${1 | 2 | 3}`;
   const hits: Partial<Record<HitKey, number>> = {};
+  // Track checkout finishes per double (segment of last dart in isCheckout turn with multiplier 2)
+  const checkoutFinishes: Partial<Record<number, number>> = {};
 
   let hasDetailedData = false;
 
@@ -83,6 +89,14 @@ export default function DartboardHeatmap({ matches, playerId }: DartboardHeatmap
         if (dart.segment === 0) continue; // miss
         const key: HitKey = `${dart.segment}_${dart.multiplier}`;
         hits[key] = (hits[key] ?? 0) + 1;
+      }
+      // Track finishing double
+      if (turn.isCheckout) {
+        const lastDart = turn.darts[turn.darts.length - 1];
+        if (lastDart && lastDart.multiplier === 2) {
+          const seg = lastDart.segment; // 50 = bullseye
+          checkoutFinishes[seg] = (checkoutFinishes[seg] ?? 0) + 1;
+        }
       }
     }
   }
@@ -105,12 +119,9 @@ export default function DartboardHeatmap({ matches, playerId }: DartboardHeatmap
     maxTriple = Math.max(maxTriple, (hits[`${seg}_3`] ?? 0));
     maxDouble = Math.max(maxDouble, (hits[`${seg}_2`] ?? 0));
   }
-  const bullHits     = hits[`50_2`] ?? 0;  // bullseye stored as segment 50, mult 2
+  const bullHits      = hits[`50_2`] ?? 0;  // bullseye stored as segment 50, mult 2
   const outerBullHits = hits[`25_1`] ?? 0; // outer bull stored as segment 25, mult 1
   const maxBull = Math.max(1, bullHits, outerBullHits);
-
-  // Tooltip state (segment label + count)
-  // Rendered purely in SVG titles for simplicity (works on mobile with long-press)
 
   const segments = SEGMENT_ORDER.map((seg, i) => {
     const startAngle = i * 18 - 9; // centre of first segment (20) at 0°, so offset by -9
@@ -122,6 +133,21 @@ export default function DartboardHeatmap({ matches, playerId }: DartboardHeatmap
 
     return { seg, startAngle, endAngle, singleHits, tripleHits, doubleHits };
   });
+
+  // Build double breakdown list sorted by total hits
+  const doubleBreakdown = [
+    ...SEGMENT_ORDER.map((seg) => ({
+      label: `D${seg}`,
+      seg,
+      hits: hits[`${seg}_2`] ?? 0,
+      checkouts: checkoutFinishes[seg] ?? 0,
+    })),
+    { label: "Bull", seg: 50, hits: bullHits, checkouts: checkoutFinishes[50] ?? 0 },
+  ]
+    .filter((d) => d.hits > 0 || d.checkouts > 0)
+    .sort((a, b) => b.hits - a.hits);
+
+  const maxDoubleHits = Math.max(1, ...doubleBreakdown.map((d) => d.hits));
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -234,6 +260,54 @@ export default function DartboardHeatmap({ matches, playerId }: DartboardHeatmap
           Bull
         </span>
       </div>
+
+      {/* Double details toggle */}
+      {doubleBreakdown.length > 0 && (
+        <button
+          onClick={() => setShowDoubleStats((v) => !v)}
+          className="text-xs text-muted underline underline-offset-2 opacity-70 active:opacity-50"
+        >
+          {showDoubleStats ? "Ukryj szczegóły doubli ▲" : "Szczegóły doubli ▼"}
+        </button>
+      )}
+
+      <AnimatePresence>
+        {showDoubleStats && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden w-full"
+          >
+            <div className="space-y-1.5 w-full pt-1">
+              <div className="grid grid-cols-[3rem_1fr_4rem_4rem] gap-x-2 text-[10px] text-muted px-1 mb-1">
+                <span>Double</span>
+                <span>Trafienia</span>
+                <span className="text-right">Razy</span>
+                <span className="text-right">Finiszów</span>
+              </div>
+              {doubleBreakdown.map((d) => (
+                <div key={d.label} className="grid grid-cols-[3rem_1fr_4rem_4rem] gap-x-2 items-center px-1">
+                  <span className="text-xs font-mono font-semibold text-neon-green">{d.label}</span>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(d.hits / maxDoubleHits) * 100}%`,
+                        background: COLOR_DOUBLE,
+                        opacity: 0.75,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[11px] font-mono text-right text-foreground">{d.hits}</span>
+                  <span className="text-[11px] font-mono text-right text-neon-purple">{d.checkouts > 0 ? d.checkouts : "—"}</span>
+                </div>
+              ))}
+              <p className="text-[10px] text-muted text-center pt-1 opacity-60">Finiszów = trafiony jako ostatni dart meczu</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

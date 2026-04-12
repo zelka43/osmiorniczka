@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import NavBar from "@/components/ui/NavBar";
 import PlayerAvatar from "@/components/ui/PlayerAvatar";
 import DartboardHeatmap from "@/components/ui/DartboardHeatmap";
-import { getPlayers, getMatches, getAppSetting } from "@/lib/store";
+import { getPlayers, getMatches, getAppSetting, getH2HRecords } from "@/lib/store";
 import {
   calculateThreeDartAvg,
   calculateCheckoutPercentage,
@@ -33,7 +33,7 @@ import {
   type AchievementKey,
   type AchievementEntry,
 } from "@/lib/statsCalculator";
-import type { Player, Match } from "@/types";
+import type { Player, Match, H2HRecord } from "@/types";
 import { PLAYER_COLORS } from "@/types";
 
 const container = {
@@ -105,16 +105,19 @@ export default function PlayersPage() {
   const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [h2hRecords, setH2hRecords] = useState<H2HRecord[]>([]);
   const [mounted, setMounted] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rankingMode, setRankingMode] = useState<RankingMode>("winpct");
   const [modal, setModal] = useState<ModalData | null>(null);
+  const [openTrophyPanel, setOpenTrophyPanel] = useState<"weekly" | "monthly" | "yearly" | null>(null);
 
   useEffect(() => {
     async function load() {
-      const [p, m, mode] = await Promise.all([getPlayers(), getMatches(), getAppSetting("ranking_mode")]);
+      const [p, m, mode, h2h] = await Promise.all([getPlayers(), getMatches(), getAppSetting("ranking_mode"), getH2HRecords()]);
       setPlayers(p);
       setMatches(m);
+      setH2hRecords(h2h);
       if (mode === "points" || mode === "winpct" || mode === "rating") setRankingMode(mode);
       if (p.length > 0) setSelectedId(p[0].id);
       setMounted(true);
@@ -167,6 +170,26 @@ export default function PlayersPage() {
     () => computeAchievementLeaders(completedMatches, players),
     [completedMatches, players]
   );
+
+  const nemesisOfiara = useMemo(() => {
+    if (!selected) return null;
+    const id = selected.id;
+    const relevant = h2hRecords.filter((r) => r.player1Id === id || r.player2Id === id);
+    const withStats = relevant
+      .map((r) => {
+        const myWins  = r.player1Id === id ? r.player1Wins : r.player2Wins;
+        const oppWins = r.player1Id === id ? r.player2Wins : r.player1Wins;
+        const oppId   = r.player1Id === id ? r.player2Id   : r.player1Id;
+        return { oppId, myWins, oppWins, total: r.totalMatches };
+      })
+      .filter((r) => r.total >= 3);
+    if (withStats.length === 0) return null;
+    const nemesis = [...withStats].sort((a, b) => b.oppWins - a.oppWins)[0];
+    const ofiara  = [...withStats].sort((a, b) => b.myWins  - a.myWins )[0];
+    const nemesisPlayer = players.find((p) => p.id === nemesis.oppId) ?? null;
+    const ofiaraPlayer  = players.find((p) => p.id === ofiara.oppId)  ?? null;
+    return { nemesis: { ...nemesis, player: nemesisPlayer }, ofiara: { ...ofiara, player: ofiaraPlayer } };
+  }, [selected, h2hRecords, players]);
 
   if (!mounted) {
     return (
@@ -324,6 +347,40 @@ export default function PlayersPage() {
             </motion.div>
           )}
 
+          {/* ── SECTION: Nemesis / Ofiara ── */}
+          {selected && nemesisOfiara && (
+            <motion.div variants={item} className="glass rounded-2xl p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Rywaleria</p>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">💀</span>
+                    <div>
+                      <p className="text-[10px] text-muted uppercase tracking-wide">Nemesis</p>
+                      <p className="text-sm font-semibold text-foreground">{nemesisOfiara.nemesis.player?.displayName ?? "?"}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-neon-red">
+                    {nemesisOfiara.nemesis.myWins}W – {nemesisOfiara.nemesis.oppWins}L
+                  </span>
+                </div>
+                <div className="border-t border-white/5" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🎯</span>
+                    <div>
+                      <p className="text-[10px] text-muted uppercase tracking-wide">Ofiara</p>
+                      <p className="text-sm font-semibold text-foreground">{nemesisOfiara.ofiara.player?.displayName ?? "?"}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-neon-green">
+                    {nemesisOfiara.ofiara.myWins}W – {nemesisOfiara.ofiara.oppWins}L
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* separator */}
           <div className="border-t border-white/5" />
 
@@ -334,28 +391,68 @@ export default function PlayersPage() {
               <div className="grid grid-cols-3 gap-3">
                 {(
                   [
-                    { key: "weekly", label: "Tygodnia", count: periodTitles.weekly },
-                    { key: "monthly", label: "Miesiąca", count: periodTitles.monthly },
-                    { key: "yearly", label: "Roku", count: periodTitles.yearly },
-                  ] as const
-                ).map(({ key, label, count }) => (
-                  <div
-                    key={key}
-                    className={`glass rounded-2xl p-3 flex flex-col items-center gap-1 transition-all ${
-                      count === 0 ? "opacity-30" : ""
-                    }`}
-                  >
-                    <Trophy
-                      size={28}
-                      className={count > 0 ? "text-yellow-400" : "text-muted"}
-                    />
-                    <span className="text-[10px] text-muted leading-tight text-center">Gracz<br />{label}</span>
-                    {count > 0 && (
-                      <span className="text-xs font-bold text-yellow-400">×{count}</span>
-                    )}
-                  </div>
-                ))}
+                    { key: "weekly"  as const, label: "Tygodnia",  medals: periodTitles.weekly  },
+                    { key: "monthly" as const, label: "Miesiąca",  medals: periodTitles.monthly },
+                    { key: "yearly"  as const, label: "Roku",      medals: periodTitles.yearly  },
+                  ]
+                ).map(({ key, label, medals }) => {
+                  const hasAny = medals.gold > 0 || medals.silver > 0 || medals.bronze > 0;
+                  const topColor = medals.gold > 0 ? "text-yellow-400" : medals.silver > 0 ? "text-gray-300" : medals.bronze > 0 ? "text-amber-600" : "text-muted";
+                  const topCount = medals.gold > 0 ? medals.gold : medals.silver > 0 ? medals.silver : medals.bronze;
+                  const isOpen = openTrophyPanel === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setOpenTrophyPanel(isOpen ? null : key)}
+                      className={`glass rounded-2xl p-3 flex flex-col items-center gap-1 transition-all active:scale-95 ${!hasAny ? "opacity-30" : ""}`}
+                    >
+                      <Trophy size={28} className={topColor} />
+                      <span className="text-[10px] text-muted leading-tight text-center">Gracz<br />{label}</span>
+                      {hasAny && <span className={`text-xs font-bold ${topColor}`}>×{topCount}</span>}
+                    </button>
+                  );
+                })}
               </div>
+              <AnimatePresence>
+                {openTrophyPanel && periodTitles[openTrophyPanel] && (() => {
+                  const medals = periodTitles[openTrophyPanel];
+                  const label = openTrophyPanel === "weekly" ? "Tygodnia" : openTrophyPanel === "monthly" ? "Miesiąca" : "Roku";
+                  return (
+                    <motion.div
+                      key={openTrophyPanel}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="glass rounded-2xl p-4 space-y-2">
+                        <p className="text-xs font-semibold text-muted">Gracz {label} — wszystkie medale</p>
+                        {medals.gold > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Trophy size={16} className="text-yellow-400" />
+                            <span className="text-xs text-foreground">Złote: <span className="font-bold text-yellow-400">×{medals.gold}</span></span>
+                          </div>
+                        )}
+                        {medals.silver > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Trophy size={16} className="text-gray-300" />
+                            <span className="text-xs text-foreground">Srebrne: <span className="font-bold text-gray-300">×{medals.silver}</span></span>
+                          </div>
+                        )}
+                        {medals.bronze > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Trophy size={16} className="text-amber-600" />
+                            <span className="text-xs text-foreground">Brązowe: <span className="font-bold text-amber-600">×{medals.bronze}</span></span>
+                          </div>
+                        )}
+                        {medals.gold === 0 && medals.silver === 0 && medals.bronze === 0 && (
+                          <p className="text-xs text-muted">Brak tytułów w tym okresie</p>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
             </motion.div>
           )}
 
