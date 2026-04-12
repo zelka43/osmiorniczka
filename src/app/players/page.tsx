@@ -182,7 +182,7 @@ export default function PlayersPage() {
         const oppId   = r.player1Id === id ? r.player2Id   : r.player1Id;
         return { oppId, myWins, oppWins, total: r.totalMatches };
       })
-      .filter((r) => r.total >= 3);
+      .filter((r) => r.total >= 1);
     if (withStats.length === 0) return null;
     const nemesis = [...withStats].sort((a, b) => b.oppWins - a.oppWins)[0];
     const ofiara  = [...withStats].sort((a, b) => b.myWins  - a.myWins )[0];
