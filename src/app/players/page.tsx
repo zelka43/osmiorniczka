@@ -17,6 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import NavBar from "@/components/ui/NavBar";
 import PlayerAvatar from "@/components/ui/PlayerAvatar";
+import DartboardHeatmap from "@/components/ui/DartboardHeatmap";
 import { getPlayers, getMatches, getAppSetting } from "@/lib/store";
 import {
   calculateThreeDartAvg,
@@ -312,6 +313,14 @@ export default function PlayersPage() {
                   value={selected.stats.bestThreeDartAvg > 0 ? selected.stats.bestThreeDartAvg.toFixed(1) : "—"}
                 />
               </div>
+            </motion.div>
+          )}
+
+          {/* ── SECTION: Heatmapa rzutów ── */}
+          {selected && (
+            <motion.div variants={item} className="glass rounded-2xl p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Heatmapa rzutów</p>
+              <DartboardHeatmap matches={completedMatches} playerId={selected.id} />
             </motion.div>
           )}
 

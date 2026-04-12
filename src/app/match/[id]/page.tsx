@@ -334,11 +334,10 @@ export default function MatchPage({
 
     const result = processTurn(currentState.remaining, score, isDoubleFinish);
 
-    // In quick mode, if player was in double territory (≤40 even, or 50) and turn is not a bust, ask about doubles
+    // In quick mode, if player was in double territory (≤40 even, or 50), ask about doubles (including busts)
     if (
       inputMode === "quick" &&
-      isDoubleTerritory(currentState.remaining) &&
-      !result.isBust
+      isDoubleTerritory(currentState.remaining)
     ) {
       setPendingQuickTurn({
         score,
